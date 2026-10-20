@@ -8,8 +8,13 @@ export const dynamic = 'force-dynamic';
 
 export default async function AdminLayout({ children }) {
   const headersList = headers();
-  const pathname = headersList.get('x-pathname') || headersList.get('next-url') || '';
-  const isLoginPage = pathname.includes('/admin/login');
+  const pathname =
+    headersList.get('x-pathname') ||
+    headersList.get('x-matched-path') ||
+    headersList.get('x-invoke-path') ||
+    headersList.get('next-url') ||
+    '';
+  const isLoginPage = pathname.includes('/admin/login') || pathname.endsWith('/login');
 
   const cookieStore = cookies();
   const supabase = createServerClient(

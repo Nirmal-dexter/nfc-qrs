@@ -1,14 +1,18 @@
 import { NextResponse } from 'next/server';
 
 export function middleware(request) {
+  const pathname = request.nextUrl.pathname;
   const requestHeaders = new Headers(request.headers);
-  requestHeaders.set('x-pathname', request.nextUrl.pathname);
+  requestHeaders.set('x-pathname', pathname);
 
-  return NextResponse.next({
+  const response = NextResponse.next({
     request: {
       headers: requestHeaders,
     },
   });
+
+  response.headers.set('x-pathname', pathname);
+  return response;
 }
 
 export const config = {
