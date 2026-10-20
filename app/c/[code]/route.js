@@ -25,11 +25,21 @@ export async function GET(request, { params }) {
   }
 
   try {
-    const { data: card, error } = await supabaseAdmin
+    let { data: card, error } = await supabaseAdmin
       .from('cards')
       .select('id, code, card_number, status, is_neglected, custom_url, shop_id, shops ( id, name, url )')
       .eq('code', code)
       .maybeSingle();
+
+    if (error && error.message && error.message.includes('is_neglected')) {
+      const fallback = await supabaseAdmin
+        .from('cards')
+        .select('id, code, card_number, status, custom_url, shop_id, shops ( id, name, url )')
+        .eq('code', code)
+        .maybeSingle();
+      card = fallback.data;
+      error = fallback.error;
+    }
 
     if (error || !card) {
       return NextResponse.redirect(`${origin}/not-found`, {
