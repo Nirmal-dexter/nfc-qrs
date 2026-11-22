@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import ShopSelector from '@/components/admin/ShopSelector';
+import ImageUploadPicker from '@/components/admin/ImageUploadPicker';
 import Modal from '@/components/ui/Modal';
 import Toast from '@/components/ui/Toast';
 
@@ -26,6 +27,16 @@ export default function QuickAssignPage() {
   const [isSearchingCard, setIsSearchingCard] = useState(false);
   const [foundCard, setFoundCard] = useState(null);
   const [cardError, setCardError] = useState('');
+
+  // Destination Mode: 'shop' (website) or 'image' (uploaded photo/menu)
+  const [destinationMode, setDestinationMode] = useState('shop');
+  const [imageState, setImageState] = useState({
+    file: null,
+    orientation: 'vertical',
+    existingUrl: '',
+  });
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
 
   // Scanner modal
   const [showScanner, setShowScanner] = useState(false);
@@ -113,6 +124,18 @@ export default function QuickAssignPage() {
       const card = list[0];
       setFoundCard(card);
       setSelectedShopId(card.shop_id || null);
+
+      if (card.custom_url && (card.custom_url.includes('/card-images/') || card.custom_url.includes('layout='))) {
+        setDestinationMode('image');
+        setImageState({
+          file: null,
+          orientation: card.custom_url.includes('layout=horizontal') ? 'horizontal' : 'vertical',
+          existingUrl: card.custom_url,
+        });
+      } else {
+        setDestinationMode('shop');
+      }
+
       setStep(2);
     } catch (err) {
       console.error('Error finding card:', err);
@@ -170,6 +193,7 @@ export default function QuickAssignPage() {
   // Step 2 -> Step 3: Save assignment
   async function handleSaveAssignment() {
     if (!foundCard) return;
+    setUploadError('');
 
     try {
       setIsSaving(true);
@@ -179,13 +203,55 @@ export default function QuickAssignPage() {
         status: foundCard.status,
       };
 
+      let patchBody = {};
+      let assignedShopName = '';
+
+      if (destinationMode === 'image') {
+        setIsUploading(true);
+        let imageUrl = '';
+
+        if (imageState.file) {
+          const formData = new FormData();
+          formData.append('file', imageState.file);
+
+          const uploadRes = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData,
+          });
+
+          const uploadData = await uploadRes.json();
+          if (!uploadRes.ok) {
+            throw new Error(uploadData.error || 'Failed to upload image');
+          }
+          imageUrl = uploadData.url;
+        } else if (imageState.existingUrl) {
+          imageUrl = imageState.existingUrl.split('#')[0];
+        } else {
+          throw new Error('Please select an image file to upload.');
+        }
+
+        const finalCustomUrl = `${imageUrl}#layout=${imageState.orientation}`;
+        patchBody = {
+          shop_id: null,
+          custom_url: finalCustomUrl,
+          status: 'assigned',
+        };
+        assignedShopName = `Uploaded Image (${imageState.orientation === 'vertical' ? 'Vertical Menu' : 'Horizontal Banner'})`;
+        setIsUploading(false);
+      } else {
+        patchBody = {
+          shop_id: selectedShopId,
+          custom_url: null,
+          status: selectedShopId ? 'assigned' : 'unassigned',
+        };
+        assignedShopName =
+          shops.find((s) => s.id === selectedShopId)?.name || 'Unassigned';
+      }
+
       const res = await fetch(`/api/cards/${foundCard.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          shop_id: selectedShopId,
-          status: selectedShopId ? 'assigned' : 'unassigned',
-        }),
+        body: JSON.stringify(patchBody),
       });
 
       const data = await res.json();
@@ -193,12 +259,10 @@ export default function QuickAssignPage() {
         throw new Error(data.error || 'Failed to save card assignment');
       }
 
-      const shopName =
-        shops.find((s) => s.id === selectedShopId)?.name || 'Unassigned';
-
       const result = {
         cardNumber: foundCard.card_number,
-        shopName,
+        code: foundCard.code,
+        shopName: assignedShopName,
         cardId: foundCard.id,
         previousState: prev,
       };
@@ -214,9 +278,11 @@ export default function QuickAssignPage() {
         previousState: prev,
       });
     } catch (err) {
+      setUploadError(err.message || 'Error saving assignment');
       alert(`Error saving card: ${err.message}`);
     } finally {
       setIsSaving(false);
+      setIsUploading(false);
     }
   }
 
@@ -382,26 +448,76 @@ export default function QuickAssignPage() {
             <Badge status={foundCard.status} />
           </div>
 
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                Select Destination Shop
-              </label>
+          {/* Mode Switcher */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wider">
+              Choose Destination Type:
+            </label>
+            <div className="grid grid-cols-2 gap-2 bg-gray-100 dark:bg-gray-700/60 p-1 rounded-xl">
               <button
                 type="button"
-                onClick={() => setShowNewShopModal(true)}
-                className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline"
+                onClick={() => setDestinationMode('shop')}
+                disabled={isSaving || isUploading}
+                className={`py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                  destinationMode === 'shop'
+                    ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+                }`}
               >
-                + New shop
+                <span>🌐</span> Shop Website
+              </button>
+              <button
+                type="button"
+                onClick={() => setDestinationMode('image')}
+                disabled={isSaving || isUploading}
+                className={`py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                  destinationMode === 'image'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+                }`}
+              >
+                <span>🖼️</span> Upload Image / Menu
               </button>
             </div>
-
-            <ShopSelector
-              shops={shops}
-              selectedShopId={selectedShopId}
-              onSelect={(shopId) => setSelectedShopId(shopId)}
-            />
           </div>
+
+          {uploadError && (
+            <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-xs">
+              {uploadError}
+            </div>
+          )}
+
+          {destinationMode === 'shop' ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  Select Destination Shop
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowNewShopModal(true)}
+                  className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  + New shop
+                </button>
+              </div>
+
+              <ShopSelector
+                shops={shops}
+                selectedShopId={selectedShopId}
+                onSelect={(shopId) => setSelectedShopId(shopId)}
+              />
+            </div>
+          ) : (
+            <div>
+              <ImageUploadPicker
+                initialUrl={imageState.existingUrl}
+                initialOrientation={imageState.orientation}
+                onChange={(val) => setImageState(val)}
+                disabled={isSaving || isUploading}
+              />
+            </div>
+          )}
 
           <div className="flex flex-col-reverse sm:flex-row gap-3 pt-2">
             <Button

@@ -460,9 +460,15 @@ export default function CardTable({
                             )}
                           </div>
                         ) : card.custom_url ? (
-                          <span className="text-xs text-gray-500 truncate max-w-xs block">
-                            {card.custom_url}
-                          </span>
+                          card.custom_url.includes('/card-images/') || card.custom_url.includes('layout=') ? (
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300">
+                              <span>🖼️</span> Image ({card.custom_url.includes('layout=horizontal') ? 'Horizontal' : 'Vertical'})
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-500 truncate max-w-xs block">
+                              {card.custom_url}
+                            </span>
+                          )
                         ) : (
                           <span className="text-gray-400 text-xs italic">
                             Unassigned
@@ -583,10 +589,18 @@ export default function CardTable({
 
                   <div className="text-sm">
                     <span className="text-gray-500 dark:text-gray-400 text-xs block">
-                      Assigned Shop:
+                      Assigned Destination:
                     </span>
                     <span className="font-medium text-gray-900 dark:text-white">
-                      {card.shops?.name || (card.custom_url ? 'Custom URL' : 'None (Unassigned)')}
+                      {card.shops?.name || (
+                        card.custom_url ? (
+                          card.custom_url.includes('/card-images/') || card.custom_url.includes('layout=') ? (
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300">
+                              <span>🖼️</span> Image ({card.custom_url.includes('layout=horizontal') ? 'Horizontal' : 'Vertical'})
+                            </span>
+                          ) : 'Custom URL'
+                        ) : 'None (Unassigned)'
+                      )}
                     </span>
                   </div>
 

@@ -12,6 +12,21 @@ const NO_CACHE_HEADERS = {
   Expires: '0',
 };
 
+function isImageDestination(url) {
+  if (!url) return false;
+  const clean = url.split('#')[0].split('?')[0].toLowerCase();
+  return (
+    url.includes('/card-images/') ||
+    clean.endsWith('.png') ||
+    clean.endsWith('.jpg') ||
+    clean.endsWith('.jpeg') ||
+    clean.endsWith('.webp') ||
+    clean.endsWith('.gif') ||
+    clean.endsWith('.svg') ||
+    url.includes('#layout=')
+  );
+}
+
 export async function GET(request, { params }) {
   const code = params?.code ? params.code.trim().toLowerCase() : '';
   const url = new URL(request.url);
@@ -90,6 +105,13 @@ export async function GET(request, { params }) {
       .catch((err) => {
         console.error('Scan logging failed:', err);
       });
+
+    if (isImageDestination(destination)) {
+      return NextResponse.redirect(`${origin}/view/${card.code}`, {
+        status: 307,
+        headers: NO_CACHE_HEADERS,
+      });
+    }
 
     return NextResponse.redirect(ensureHttps(destination), {
       status: 307,
