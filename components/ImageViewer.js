@@ -6,14 +6,16 @@ export default function ImageViewer({
   imageUrl,
   defaultLayout = 'vertical',
   title = '',
-  cardCode = '',
-  cardNumber = null,
 }) {
   const [layout, setLayout] = useState(defaultLayout); // 'vertical' or 'horizontal'
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [copySuccess, setCopySuccess] = useState(false);
   const imgRef = useRef(null);
+
+  // Clean title: NEVER show internal card identifiers like "Card #112" to customers
+  const displayTitle =
+    title && !title.toLowerCase().startsWith('card #') ? title.trim() : '';
 
   function handleZoomIn() {
     setZoom((prev) => Math.min(prev + 0.25, 3));
@@ -33,9 +35,10 @@ export default function ImageViewer({
   }
 
   async function handleShare() {
+    const shareTitle = displayTitle || 'Image';
     const shareData = {
-      title: title || 'QR Card Image',
-      text: title ? `Check out ${title}` : 'View card image',
+      title: shareTitle,
+      text: displayTitle ? `Check out ${displayTitle}` : 'View image',
       url: window.location.href,
     };
 
@@ -66,7 +69,7 @@ export default function ImageViewer({
       const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = blobUrl;
-      link.download = `${title || 'card-image'}-${cardCode || 'download'}.jpg`;
+      link.download = `${displayTitle || 'menu-image'}.jpg`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -82,14 +85,11 @@ export default function ImageViewer({
       {/* Sticky Header */}
       <header className="sticky top-0 z-30 bg-neutral-900/90 backdrop-blur-md border-b border-neutral-800 px-4 py-3 flex items-center justify-between gap-3 shadow-lg">
         <div className="min-w-0 flex-1">
-          <h1 className="text-base sm:text-lg font-bold text-white truncate">
-            {title || 'Card Image'}
-          </h1>
-          {cardNumber && (
-            <p className="text-xs text-neutral-400 font-mono">
-              Card #{cardNumber}
-            </p>
-          )}
+          {displayTitle ? (
+            <h1 className="text-base sm:text-lg font-bold text-white truncate">
+              {displayTitle}
+            </h1>
+          ) : null}
         </div>
 
         {/* Action Controls */}
@@ -230,7 +230,7 @@ export default function ImageViewer({
               <img
                 ref={imgRef}
                 src={imageUrl}
-                alt={title || 'Card Image'}
+                alt={displayTitle || 'Image'}
                 className="w-full h-auto rounded-2xl shadow-2xl object-contain border border-neutral-800"
                 loading="eager"
               />
@@ -249,7 +249,7 @@ export default function ImageViewer({
               <img
                 ref={imgRef}
                 src={imageUrl}
-                alt={title || 'Card Image'}
+                alt={displayTitle || 'Image'}
                 className="max-w-full max-h-[85vh] w-auto h-auto rounded-2xl shadow-2xl object-contain border border-neutral-800"
                 loading="eager"
               />
@@ -258,9 +258,9 @@ export default function ImageViewer({
         )}
       </main>
 
-      {/* Footer Branding */}
-      <footer className="py-4 text-center text-xs text-neutral-500 border-t border-neutral-900">
-        Powered by NFC & QR Smart Cards
+      {/* Footer Note */}
+      <footer className="py-3 text-center text-xs text-neutral-500 border-t border-neutral-900">
+        Pinch or use buttons to zoom
       </footer>
     </div>
   );

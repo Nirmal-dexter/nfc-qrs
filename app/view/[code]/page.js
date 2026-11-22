@@ -5,10 +5,22 @@ import ImageViewer from '@/components/ImageViewer';
 export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }) {
-  const { code } = params;
-  return {
-    title: `View Card ${code} | NFC QRS`,
-  };
+  try {
+    const { code } = params;
+    const { data: card } = await supabaseAdmin
+      .from('cards')
+      .select('shops ( name )')
+      .eq('code', code)
+      .maybeSingle();
+    const shopName = Array.isArray(card?.shops) ? card.shops[0]?.name : card?.shops?.name;
+    return {
+      title: shopName || 'View',
+    };
+  } catch {
+    return {
+      title: 'View',
+    };
+  }
 }
 
 export default async function ViewCardImagePage({ params }) {
@@ -54,15 +66,13 @@ export default async function ViewCardImagePage({ params }) {
 
     const cleanImageUrl = destination.split('#')[0];
     const shopName = Array.isArray(card.shops) ? card.shops[0]?.name : card.shops?.name;
-    const title = shopName || `Card #${card.card_number}`;
+    const title = shopName || '';
 
     return (
       <ImageViewer
         imageUrl={cleanImageUrl}
         defaultLayout={defaultLayout}
         title={title}
-        cardCode={card.code}
-        cardNumber={card.card_number}
       />
     );
   } catch (err) {
